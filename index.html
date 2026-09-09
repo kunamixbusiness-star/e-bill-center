@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RKS E-Bill Center - All Services</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*{font-family: sans-serif; box-sizing:border-box}
+body{background:#f1f5f9; padding:20px}
+.card{background:white; max-width:800px; margin:auto; padding:20px; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.1)}
+input,select{width:100%; padding:10px; margin:6px 0; border:1px solid #ccc; border-radius:8px}
+.row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.item-row{display:grid; grid-template-columns:2fr 1fr 1fr 1fr auto; gap:8px; margin-bottom:8px}
+button{padding:10px 16px; border:none; border-radius:8px; cursor:pointer; background:#0f172a; color:white}
+.btn-green{background:#16a34a} .btn-blue{background:#2563eb}
+#billPreview{border:2px dashed #ccc; padding:20px; margin-top:20px}
+</style>
+</head>
+<body>
+<div class="card">
+<h2>🖨️ E-Bill Generator - All Services</h2>
+
+<div class="row">
+<div><label>Shop Name</label><input id="shopName" value="RKS PAN CARD CENTER" oninput="renderBill()"></div>
+<div><label>GSTIN (Optional)</label><input id="gstin" value="22AAAAA0000A1Z5" oninput="renderBill()"></div>
+</div>
+
+<div class="row">
+<div><label>Bill Type</label>
+<select id="billType" onchange="renderBill()">
+<option>PAN Card Service</option>
+<option>Aadhaar Print Service</option>
+<option>Mobile Recharge</option>
+<option>CSC Service</option>
+<option>Insurance / Other</option>
+<option>Custom Service</option>
+</select></div>
+<div><label>Customer Name</label><input id="custName" placeholder="ROHIT KUMAR" oninput="renderBill()"></div>
+</div>
+
+<div class="row">
+<div><label>Invoice No</label><input id="invNo" value="1001" oninput="renderBill()"></div>
+<div><label>Date</label><input id="invDate" type="date"></div>
+</div>
+
+<h3>Items / Services</h3>
+<div id="items"></div>
+<button onclick="addItem()">+ Add Item</button>
+
+<div style="margin-top:15px" class="row">
+<div><label>GST Type</label><select id="gstType" onchange="renderBill()"><option>CGST+SGST</option><option>IGST</option><option>No GST</option></select></div>
+<div><label>GST %</label><select id="gstPer" onchange="renderBill()"><option value="0">0%</option><option value="5" selected>5%</option><option value="18">18%</option></select></div>
+</div>
+
+<div id="billPreview"></div>
+
+<div style="margin-top:20px; display:flex; gap:10px">
+<button class="btn-green" onclick="downloadPDF()">Download PDF</button>
+<button class="btn-blue" onclick="window.print()">Print Bill</button>
+</div>
+</div>
+
+<script>
+let itemList = [{name:'PAN Card Service', qty:1, rate:107, hsn:'998314'}];
+const itemsDiv = document.getElementById('items');
+function addItem(){ itemList.push({name:'', qty:1, rate:0, hsn:''}); renderItems(); }
+function renderItems(){
+itemsDiv.innerHTML='';
+itemList.forEach((it,i)=>{
+itemsDiv.innerHTML+=`<div class="item-row">
+<input placeholder="Service Name" value="${it.name}" oninput="itemList[${i}].name=this.value; renderBill()">
+<input placeholder="HSN" value="${it.hsn}" oninput="itemList[${i}].hsn=this.value; renderBill()">
+<input type="number" placeholder="Qty" value="${it.qty}" oninput="itemList[${i}].qty=this.value; renderBill()">
+<input type="number" placeholder="Rate" value="${it.rate}" oninput="itemList[${i}].rate=this.value; renderBill()">
+<button onclick="itemList.splice(${i},1); renderItems()">X</button>
+</div>`;
+});
+renderBill();
+}
+function renderBill(){
+const shop=document.getElementById('shopName').value;
+const gstin=document.getElementById('gstin').value;
+const cust=document.getElementById('custName').value||'Customer';
+const type=document.getElementById('billType').value;
+const inv=document.getElementById('invNo').value;
+const date=document.getElementById('invDate').value||new Date().toISOString().split('T')[0];
+const gstType=document.getElementById('gstType').value;
+const gstPer=parseFloat(document.getElementById('gstPer').value);
+let total=0; itemList.forEach(i=> total+= (i.qty*i.rate));
+let gstAmt = total * gstPer / 100;
+let grand = total + gstAmt;
+let html=`<h2 style="text-align:center">${shop}</h2>
+<p style="text-align:center">GSTIN: ${gstin} | Service: ${type}</p>
+<hr>
+<p><b>Bill To:</b> ${cust} | <b>Inv:</b> ${inv} | <b>Date:</b> ${date}</p>
+<table width="100%" border="1" cellspacing="0" cellpadding="6"><tr><th>Item (HSN)</th><th>Qty</th><th>Rate</th><th>Total</th></tr>`;
+itemList.forEach(it=>{
+html+=`<tr><td>${it.name} (${it.hsn})</td><td>${it.qty}</td><td>₹${it.rate}</td><td>₹${it.qty*it.rate}</td></tr>`;
+});
+html+=`</table><br><p style="text-align:right"><b>Subtotal: ₹${total.toFixed(2)}</b><br>`;
+if(gstType!=='No GST'){ html+=`${gstType} ${gstPer}%: ₹${gstAmt.toFixed(2)}<br>`; }
+html+=`<b>Grand Total: ₹${grand.toFixed(2)}</b></p><p style="text-align:center; font-size:12px">Thank You Visit Again - This is computer generated bill</p>`;
+document.getElementById('billPreview').innerHTML=html;
+}
+function downloadPDF(){
+const {jsPDF} = window.jspdf;
+const doc = new jsPDF();
+doc.text(document.getElementById('billPreview').innerText, 10, 10);
+doc.save(`Bill_${document.getElementById('invNo').value}.pdf`);
+}
+document.getElementById('invDate').valueAsDate = new Date();
+renderItems();
+</script>
+</body>
+</html>
